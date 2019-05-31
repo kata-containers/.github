@@ -13,7 +13,7 @@ their own versions in their `.github/` directory.
 
 ## GitHub files
 
-See [our `.github` documentation](.github).
+See [our `.github` documentation](.github/README-templates.md).
 
 ## Contributing
 
