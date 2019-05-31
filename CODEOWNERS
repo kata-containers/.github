@@ -9,5 +9,18 @@
 # Order in this file is important. Only the last match will be
 # used. See https://help.github.com/articles/about-code-owners/
 
+# All markdown documentation needs an extra review
+#
+# Note: this will still detect doc changes below "vendor/", but we set
+# `prune.non-go=true` in `Gopkg.toml` which filters out any doc files
+# in vendored repos.
 *.md    @kata-containers/documentation
 
+# Kernel changes are delicate so require additional reviews.
+/kernel/    @kata-containers/kernel
+
+# All protocol changes need to get some review from these groups.
+#
+# Note, we include all subdirs, including the vendor dir, as at present there are no .proto files
+# in the vendor dir. Later we may have to extend this matching rule if that changes.
+*.proto    @kata-containers/architecture-committee @kata-containers/builder @kata-containers/packaging
