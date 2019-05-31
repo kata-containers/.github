@@ -11,6 +11,10 @@ This repository stores
 These files apply to all other Kata Containers repositories that do not have
 their own versions in their `.github/` directory.
 
+## GitHub files
+
+See [our `.github` documentation](.github).
+
 ## Contributing
 
 See [the contributing document](CONTRIBUTING.md).
