@@ -2,7 +2,7 @@
 name: ➕ Enhancement request
 about: Suggest an improvement to an existing feature
 title: ''
-labels: enhancement
+labels: 'enhancement, needs-review'
 assignees: ''
 
 ---
