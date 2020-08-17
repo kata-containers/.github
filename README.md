@@ -15,6 +15,10 @@ their own versions in their `.github/` directory.
 
 See [our `.github` documentation](.github/README-templates.md).
 
+## Scripts
+
+See the [scripts](scripts) documentation.
+
 ## Contributing
 
 See [the contributing document](CONTRIBUTING.md).
