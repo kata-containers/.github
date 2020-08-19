@@ -277,8 +277,9 @@ find_git_checkout()
     # Check the parent directory first
     dirs+=("$PWD/../${repo_name}")
 
-    # If it's a golang project, it should be here
-    [ -n "$GOPATH" ] && dirs+=("$GOPATH/src/github.com/${repo_slug}")
+    # Check GOPATH in case it's a golang project.
+    [ -z "${GOPATH:-}" ] && GOPATH=$(go env GOPATH 2>/dev/null || true)
+    [ -n "${GOPATH:-}" ] && dirs+=("$GOPATH/src/github.com/${repo_slug}")
 
     local dir
 
@@ -649,8 +650,6 @@ setup()
     do
         command -v "$cmd" &>/dev/null || die "need command: $cmd"
     done
-
-    [ -z "$GOPATH" ] && die "need GOPATH" || true
 }
 
 handle_args()
