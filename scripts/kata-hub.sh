@@ -13,6 +13,8 @@ set -o pipefail
 
 script_name=${0##*/}
 
+local_repo=""
+
 #---------------------------------------------------------------------
 
 die()
@@ -35,24 +37,28 @@ Command descriptions:
   list-issue-linked-prs  List all PRs with linked issues.
   list-issue-projects    List projects an issue is part of.
   list-issues            List issues in a project.
+  list-issues-for-pr     List issues linked to a PR.
   list-milestone         List issues in a milestone.
   list-milestones        List milestones.
   list-pr-linked-issues  List all issues with linked PRs.
+  list-prs-for-issue     List all PRs linked to an issue.
   list-projects          List projects.
   move-issue             Move an issue card to another project column.
 
 Commands and arguments:
 
-  add-issue            <issue> <project> <project-type> [<column-name>]
-  list-columns         <project> <project-type>
+  add-issue             <issue> <project> <project-type> [<column-name>]
+  list-columns          <project> <project-type>
   list-issue-linked-prs
-  list-issue-projects  <issue>
-  list-issues          <project> <project-type>
-  list-milestone       <milestone>
+  list-issue-projects   <issue>
+  list-issues           <project> <project-type>
+  list-issues-for-pr    <pr>
+  list-milestone        <milestone>
   list-milestones
   list-pr-linked-issues
-  list-projects        <project-type>
-  move-issue           <issue> <project> <project-type> <project-column>
+  list-prs-for-issue    <issue>
+  list-projects         <project-type>
+  move-issue            <issue> <project> <project-type> <project-column>
 
 Options:
 
@@ -92,11 +98,43 @@ EOT
 #
 #   inertia-preview : Projects.
 #   starfox-preview : Project card details.
+github_api_with_preview()
+{
+    local preview="${1:-}"
+
+    [ -z "$preview" ] && die "need GitHub API preview value"
+
+    shift
+
+    hub api \
+        --paginate \
+        -H "accept: ${preview}" "$@"
+}
+
+# Make a GitHub API call using the default preview value
 github_api()
 {
     local preview='application/vnd.github.inertia-preview+json'
 
-    hub api -H "accept: ${preview}" "$@"
+    github_api_with_preview "$preview" "$@"
+}
+
+# Run a "human-readable" GitHub query.
+#
+# Note that the query terms must be *space* separated!
+#
+# See:
+#
+# https://docs.github.com/en/github/searching-for-information-on-github/understanding-the-search-syntax
+github_human_query()
+{
+    local query="${1:-}"
+
+    [ -z "$query" ] && die "need query"
+
+    github_api \
+        -XGET search/issues \
+        -f q="${query}"
 }
 
 # Convert an API url to a human-readable HTML one.
@@ -132,7 +170,7 @@ get_repo_slug()
 {
     local repo_url=$(get_repo_url || true)
 
-    [ -z "$repo_url" ] && die "cannot determine repo URL"
+    [ -z "$repo_url" ] && die "cannot determine local git repo URL"
 
     echo "$repo_url" | awk -F\/ '{print $4, $5}' | tr ' ' '/'
 }
@@ -184,8 +222,8 @@ get_project_columns_url()
         -f state="open" |\
         jq -r '.[] |
         select((.name | ascii_downcase)
-            == ($project_name | ascii_downcase))
-            | .columns_url' \
+            == ($project_name | ascii_downcase)) |
+            .columns_url' \
         --arg project_name "$project")"
 
     echo "$columns_url"
@@ -215,13 +253,16 @@ list_projects_for_issue()
 
     # Note that all events are always available to query. There is no
     # timestamp, but they are ordered, first to last. Hence, only consider the
-    # last event (array index '-1') as it shows the current status.
-    hub api \
-        -H 'accept: application/vnd.github.starfox-preview+json' \
+    # last event as it shows the current status.
+    local preview='application/vnd.github.starfox-preview+json'
+
+    github_api_with_preview "$preview" \
         -XGET "/repos/{owner}/{repo}/issues/${issue}/events" |\
-        jq -r '.[-1] |
-        select (.project_card != null) .project_card |
+        jq -r '.[] |
+            select(.project_card != null) | .project_card |
+            map_values(.|tostring) |
             join("|")' |\
+            tail -1 |\
         while read fields
         do
             local card_id=$(echo "$fields"|cut -d\| -f1)
@@ -260,7 +301,7 @@ issue_is_in_project()
     local card_id=$(echo "$fields"|cut -d';' -f4)
     local card_url=$(echo "$fields"|cut -d';' -f5)
 
-    echo "${column_name};${card_id};${card_url}"
+    printf "%s;%s;%s\n" "$column_name" "${card_id}" "${card_url}"
 }
 
 find_git_checkout()
@@ -308,14 +349,16 @@ list_project_columns()
     [ -z "$columns_url" ] && die "cannot determine column URL for project '$project'"
 
     echo "# Columns for '$project_type' project '$project' (url: $project_url)"
+    echo "#"
+    echo "# Fields: column-index;column-url;column-id;column-name"
 
     local column_details
     local column_index=0
 
-    echo "# (index; column_url; column_id; column_name)"
-
     github_api "$columns_url" |\
-            jq -r '.[] | join("|")' |\
+            jq -r '.[] |
+            map_values(.|tostring) |
+            join("|")' |\
             while read column_details
     do
         local column_url=$(echo "$column_details"|cut -d'|' -f1)
@@ -372,7 +415,7 @@ list_issues_in_project()
 
         github_api "$column_cards_url" |\
             jq -r '.[] |
-            [.id, .url, .content_url] |
+            [(.id|tostring), .url, .content_url] |
             join("|")' |\
             while read fields
         do
@@ -448,7 +491,7 @@ add_issue_to_project()
 
     # Issues are implicity repo-level entities
     local issue_id="$(github_api "repos/{owner}/{repo}/issues/${issue}" |\
-            jq -r '.id')"
+        jq -r '(.id|tostring)')"
     [ -z "$issue_id" ] && die "cannot determine issue id for issue $issue"
 
     local project_url
@@ -501,7 +544,7 @@ move_issue_project_column()
 
     # Issues are implicity repo-level entities
     local issue_id="$(github_api "repos/{owner}/{repo}/issues/${issue}" |\
-            jq -r '.id')"
+        jq -r '(.id|tostring)')"
     [ -z "$issue_id" ] && die "cannot determine issue id for issue $issue"
 
     local project_url
@@ -560,6 +603,9 @@ list_projects()
 
     local fields
 
+    echo "# Fields: project-name;project-url"
+    echo "#"
+
     github_api "$project_url" | jq -r '.[] |
         [.name, .html_url] |
         join ("|")' |\
@@ -568,7 +614,7 @@ list_projects()
         local project_name=$(echo "$fields"|cut -d'|' -f1)
         local project_url=$(echo "$fields"|cut -d'|' -f2)
 
-        printf "\"%s\" %s\n" "$project_name" "$project_url"
+        printf "%s;%s\n" "$project_name" "$project_url"
     done | sort -k1,1
 
     echo
@@ -580,7 +626,7 @@ list_milestones()
 
     github_api -XGET "/repos/{owner}/{repo}/milestones" |\
         jq -r '.[] |
-        [.title, .html_url, .open_issues, .closed_issues] |
+        [.title, .html_url, (.open_issues|tostring), (.closed_issues|tostring)] |
         join ("|")' |\
     while read fields
     do
@@ -599,49 +645,163 @@ list_milestones()
     echo
 }
 
-raw_github_query()
+# Returns a comma-separated list of PR URLs associated with
+# the specified issue number.
+get_prs_linked_to_issue()
 {
-    local query="${1:-}"
+    local issue="${1:-}"
 
-    [ -z "$query" ] && die "need query"
+    [ -z "$issue" ] && die "need issue"
 
-    curl -sL "https://api.github.com/search/issues?q=${query}"
+    local preview='application/vnd.github.mockingbird-preview+json'
+
+    github_api_with_preview \
+        "$preview" \
+        "/repos/{owner}/{repo}/issues/${issue}/timeline" |\
+        jq -r '.[] | select(.source != null) | .source.issue.pull_request.html_url'
 }
 
+# List issues with one or more [*] links to a PR.
+#
+# [*] - Consider an issue which has fixes in master and a number of stable
+#       branches.
+list_pr_linked_issues()
+{
+    local show_all="${1:-}"
+    [ -z "$show_all" ] && die "need bool for show_all"
+
+    local query="repo:${local_repo} is:issue linked:pr"
+
+    [ "$show_all" != "true" ] && query+=" is:open"
+
+    echo "# Issues with linked PRs"
+    echo "#"
+    echo "# Fields: issue;issue-url;pr-url"
+    echo "#"
+    echo "# (note: potentially multiple lines per issue)"
+
+    local fields
+
+    github_human_query "$query" |\
+        jq -r 'select(.items != null) | .items[] | [ (.number|tostring), .html_url] | join("|")' |\
+        sort -n |\
+        while read fields
+        do
+            local issue=$(echo "$fields"|cut -d'|' -f1)
+            local issue_url=$(echo "$fields"|cut -d'|' -f2)
+
+            local pr_urls=$(get_prs_linked_to_issue "$issue")
+
+            local pr_url
+            for pr_url in $pr_urls
+            do
+                printf "%s;%s;%s\n" "$issue" "$issue_url" "$pr_url"
+            done
+        done
+}
+
+list_prs_for_issue()
+{
+    local issue="${1:-}"
+
+    [ -z "$issue" ] && die "need issue"
+
+    local pr_urls=$(get_prs_linked_to_issue "$issue" || true)
+
+    echo "# PRs linked to issue"
+    echo "#"
+    echo "# Fields: issue;pr-url"
+
+    local pr_url
+    for pr_url in $pr_urls
+    do
+        printf "%s;%s\n" "$issue" "$pr_url"
+    done
+}
+
+list_issues_for_pr()
+{
+    local pr="${1:-}"
+
+    [ -z "$pr" ] && die "need PR"
+
+    local prs=$(list_issue_linked_prs "true")
+
+    echo "# Issues linked to PR"
+    echo "#"
+    echo "# Fields: pr;pr-url;issue-url"
+
+    local line
+    echo "$prs"|while read line
+    do
+        echo "$line"|grep -vq "/pull/${pr};" && continue
+
+        printf "%s;%s\n" "$pr" "$line"
+    done
+}
+
+# List PRs with one or more [*] links to an issue.
+#
+# [*] - Consider a PR which includes multiple "Fixes: #XXX" comments.
+#
+# Notes: Since GitHub doesn't provide an API to list issues fixed by a PR,
+# this functions strategy is:
+#
+# 1) List all issues with linked PRs.
+# 2) List all PRs with linked issues.
+# 3) Loop over the results of (1) looking for each PR found in (2).
+#
+# This works, but is very inefficient!
 list_issue_linked_prs()
 {
-    local repo=$(get_repo_slug)
-    local query="repo:${repo}+is:pr+is:open+linked:issue"
+    local show_all="${1:-}"
+    [ -z "$show_all" ] && die "need bool for show_all"
+
+    local query="repo:${local_repo} is:pr linked:issue"
+
+    [ "$show_all" != "true" ] && query+=" is:open"
 
     echo "# PRs with linked issues"
     echo "#"
     echo "# Fields: pr-url;issue-url"
-
-    local line
-
-    raw_github_query "$query" | jq -r '.items[] |
-            [ .url, .html_url] |
-            join("|")' | sort -n | while read line
-    do
-            local issue_api_url=$(echo "$line"|cut -d'|' -f1)
-            local pr_url=$(echo "$line"|cut -d'|' -f2)
-
-            local issue_url=$(github_api_url_to_html_url "$issue_api_url")
-
-            printf "%s;%s\n" "$pr_url" "$issue_url"
-    done
-}
-
-list_pr_linked_issues()
-{
-    local repo=$(get_repo_slug)
-    local query="repo:${repo}+is:issue+is:open+linked:pr"
-
-    echo "# Issues with linked PRs"
     echo "#"
-    echo "# Fields: issue-url"
+    echo "# (note: potentially multiple lines per PR)"
 
-    raw_github_query "$query" | jq -r '.items[].html_url' | sort -n
+    local issues_with_linked_prs=$(list_pr_linked_issues "$show_all" |\
+        grep -v "^\#")
+
+    local pr_url
+
+    github_human_query "$query" |\
+            jq -r 'select(.items != null) | .items[] | .html_url' |\
+            sort -n |\
+            while read pr_url
+    do
+            local issues=()
+
+            local issue_line
+
+            # Note that this (multi-line) variable cannot be quoted
+            for issue_line in $issues_with_linked_prs
+            do
+                echo "$issue_line"|grep -qv ";${pr_url}$" && continue
+
+                local issue_url=$(echo "$issue_line"|cut -d';' -f2)
+
+                issues+=("$issue_url")
+            done
+
+            # Handle an "impossible situation"; GitHub told us this PR has
+            # linked issues, so there should be some!
+            [ ${#issues[*]} = 0 ] && \
+                die "failed to find issues linked to issue-linked PRs"
+
+            local issue_url
+            for issue_url in "${issues[@]}"
+            do
+                printf "%s;%s\n" "$pr_url" "$issue_url"
+            done
+    done
 }
 
 setup()
@@ -650,23 +810,40 @@ setup()
     do
         command -v "$cmd" &>/dev/null || die "need command: $cmd"
     done
+
+    local_repo=$(get_repo_slug)
 }
 
 handle_args()
 {
     setup
 
+    local show_all="false"
+    local opt
+
+    while getopts "ah" opt "$@"
+    do
+        case "$opt" in
+            a) show_all="true" ;;
+            h) usage && exit 0 ;;
+        esac
+    done
+
+    shift $[$OPTIND-1]
+
     local cmd="${1:-}"
 
     case "$cmd" in
         add-issue) ;;
-        help|-h|--help|usage) usage && exit 0 ;;
+        help|--help|usage) usage && exit 0 ;;
         list-columns) ;;
         list-issue-linked-prs) ;;
         list-issue-projects) ;;
         list-issues) ;;
+        list-issues-for-pr) ;;
         list-milestones) ;;
         list-pr-linked-issues) ;;
+        list-prs-for-issue) ;;
         list-projects) ;;
         move-issue) ;;
 
@@ -678,9 +855,10 @@ handle_args()
     shift
 
     local issue=""
+    local pr=""
     local project=""
-    local project_type=""
     local project_column=""
+    local project_type=""
 
     case "$cmd" in
         add-issue)
@@ -701,7 +879,7 @@ handle_args()
             list_project_columns "$project" "$project_type"
             ;;
 
-        list-issue-linked-prs) list_issue_linked_prs ;;
+        list-issue-linked-prs) list_issue_linked_prs "$show_all" ;;
 
         list-issue-projects)
             issue="${1:-}"
@@ -716,9 +894,21 @@ handle_args()
             list_issues_in_project "$project" "$project_type"
             ;;
 
+        list-issues-for-pr)
+            pr="${1:-}"
+
+            list_issues_for_pr "$pr"
+            ;;
+
         list-milestones) list_milestones ;;
 
-        list-pr-linked-issues) list_pr_linked_issues ;;
+        list-pr-linked-issues) list_pr_linked_issues "$show_all" ;;
+
+        list-prs-for-issue)
+            issue="${1:-}"
+
+            list_prs_for_issue "$issue"
+            ;;
 
         list-projects)
             project_type="${1:-}"
