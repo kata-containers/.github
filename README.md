@@ -1,6 +1,8 @@
 # `.github`
 
 * [Overview](#overview)
+* [GitHub files](#github-files)
+* [Scripts](#scripts)
 * [Contributing](#contributing)
 * [Code of conduct](#code-of-conduct)
 
