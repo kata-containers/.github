@@ -153,11 +153,12 @@ github_api_url_to_html_url()
 {
         local api_url="${1:-}"
 
-        [ -z "$api_url" ] && die "need API url"
+        [ -z "$api_url" ] && die "need API URL"
 
         echo "$api_url" |\
                 sed \
                 -e 's/api.github.com/github.com/g' \
+                -e 's!/pulls/!/pull/!g' \
                 -e 's!/repos!!g'
 }
 
