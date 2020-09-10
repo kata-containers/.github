@@ -32,18 +32,20 @@ Description: Utility to expand the abilities of the GitHub hub(1) tool.
 
 Command descriptions:
 
-  add-issue              Add an issue to a project.
-  list-columns           List project board columns.
-  list-issue-linked-prs  List all PRs with linked issues.
-  list-issue-projects    List projects an issue is part of.
-  list-issues            List issues in a project.
-  list-issues-for-pr     List issues linked to a PR.
-  list-milestone         List issues in a milestone.
-  list-milestones        List milestones.
-  list-pr-linked-issues  List all issues with linked PRs.
-  list-prs-for-issue     List all PRs linked to an issue.
-  list-projects          List projects.
-  move-issue             Move an issue card to another project column.
+  add-issue                 Add an issue to a project.
+  list-columns              List project board columns.
+  list-issue-linked-prs (*) List all PRs with linked issues.
+  list-issue-projects       List projects an issue is part of.
+  list-issues               List issues in a project.
+  list-issues-for-pr        List issues linked to a PR.
+  list-milestone            List issues in a milestone.
+  list-milestones           List milestones.
+  list-pr-linked-issues (*) List all issues with linked PRs.
+  list-prs-for-issue        List all PRs linked to an issue.
+  list-projects             List projects.
+  move-issue                Move an issue card to another project column.
+
+(*) - Unreliable - see BUGS below.
 
 Commands and arguments:
 
@@ -84,6 +86,14 @@ Notes:
 
 - GitHub requires that an issue be in a project before it can be moved,
   so you must call "add-issue" before you can call "move-issue".
+
+BUGS:
+
+- Note that some commands (those mapping issues to PRs and PRs to issues)
+  appear to be unreliable; they return the same values as the GitHub web
+  search results (https://github.com/search), but the underlying GitHub API
+  appears to be either broken or its behaviour is not fully documented as the
+  results appear incorrect / incomplete.
 
 EOT
 }
@@ -726,18 +736,57 @@ list_issues_for_pr()
 
     [ -z "$pr" ] && die "need PR"
 
-    local prs=$(list_issue_linked_prs "true")
+    local pr_api_url=$(github_api \
+        -XGET "/repos/{owner}/{repo}/pulls/$pr" |\
+        jq -r '.url' || true)
+    [ -z "$pr_api_url" ] && die "cannot determine API URL for PR $pr"
+
+    local pr_url=$(github_api_url_to_html_url "$pr_api_url" || true)
+    [ -z "$pr_url" ] && die "cannot determine URL for PR $pr"
+
+    local commits=$(github_api \
+        -XGET "/repos/{owner}/{repo}/pulls/$pr/commits" |\
+    jq -r '.[].commit.message' || true)
+
+    [ -z "$commits" ] && die "cannot determine commits for PR $pr"
+
+    # Extract the issue number(s) from the commits.
+    #
+    # This needs to be careful to take account of lines like this:
+    #
+    # fixes 99
+    # fixes #123.
+    # Fixes: #1, #234, #5678.
+    #
+    # Note the exclusion of lines starting with whitespace which is
+    # specifically to ignore vendored git log comments, which are whitespace
+    # indented and in the format:
+    #
+    #     "<git-commit> <git-commit-msg>"
+    #
+    local issues=$(echo "$commits" |\
+        egrep -v "^( |	)" |\
+        egrep -i "fixes: *(#[0-9][0-9]*)" |\
+        tr ' ' '\n' |\
+        grep "[0-9][0-9]*" |\
+        sed 's/[.,\#]//g' |\
+        sort -nu || true)
+
+    [ -z "$issues" ] && die "cannot determine issues for PR $pr"
 
     echo "# Issues linked to PR"
     echo "#"
     echo "# Fields: pr;pr-url;issue-url"
 
-    local line
-    echo "$prs"|while read line
+    local issue
+    echo "$issues"|while read issue
     do
-        echo "$line"|grep -vq "/pull/${pr};" && continue
+        local url_prefix=$(echo "$pr_url" | cut -d\/ -f1-5)
+        local issue_url=$(printf "%s/issues/%s" \
+            "$url_prefix" \
+            "$issue")
 
-        printf "%s;%s\n" "$pr" "$line"
+        printf "%s;%s;%s\n" "$pr" "$pr_url" "$issue_url"
     done
 }
 
