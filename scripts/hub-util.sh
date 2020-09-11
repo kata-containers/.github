@@ -766,7 +766,7 @@ list_issues_for_pr()
     #
     local issues=$(echo "$commits" |\
         egrep -v "^( |	)" |\
-        egrep -i "fixes: *(#[0-9][0-9]*)" |\
+        egrep -i "fixes:* *(#[0-9][0-9]*)" |\
         tr ' ' '\n' |\
         grep "[0-9][0-9]*" |\
         sed 's/[.,\#]//g' |\
