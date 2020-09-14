@@ -12,3 +12,16 @@ Lists all available options:
 ```sh
 $ hub-util.sh -h
 ```
+
+## PR porting checks
+
+The `pr-porting-checks.sh` script checks a PR to ensure it follows the PR
+porting policy. It is designed to be called from a GitHub action.
+
+### Full details
+
+Lists all available options:
+
+```sh
+$ pr-porting-checks.sh -h
+```
