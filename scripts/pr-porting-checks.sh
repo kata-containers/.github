@@ -75,10 +75,16 @@ handle_args()
 	local backport_labels=("needs-backport" "no-backport-needed" "backport")
 	local forward_port_labels=("needs-forward-port" "no-forward-port-needed" "forward-port")
 
+	# If a PR is labelled with one of these labels, ignore all further
+	# checks (since the PR is not yet "ready").
+	local ignore_labels=("do-not-merge" "rfc" "wip")
+
 	local labels=$(hub api "/repos/{owner}/{repo}/labels" | jq -r '.[].name')
 
 	local label
 
+	# Note: no validation done on ignore_labels as they are not actually
+	# porting labels, and so are not essential.
 	for label in ${backport_labels[@]} ${forward_port_labels[@]}
 	do
 		local ret
@@ -103,6 +109,21 @@ handle_args()
 		$(echo "${backport_labels[@]}" | tr ' ' ',') \
 		$(echo "${forward_port_labels[@]}" | tr ' ' ',')
 		exit 1
+	}
+
+	local ignore_labels_found=()
+
+	for label in ${ignore_labels[@]}
+	do
+		echo "$pr_labels" | egrep -q "^${label}$" \
+			&& ignore_labels_found+=("$label")
+	done
+
+	[ "${#ignore_labels_found[@]}" -gt 0 ] && {
+		printf "::debug::Ignoring porting checks as PR %s contains the following special labels: '%s'" \
+		"$pr" \
+		$(echo "${ignore_labels_found[@]}" | tr ' ' ',')
+		exit 0
 	}
 
 	local backport_labels_found=()
