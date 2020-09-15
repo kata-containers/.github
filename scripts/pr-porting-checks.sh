@@ -79,7 +79,7 @@ handle_args()
 	# checks (since the PR is not yet "ready").
 	local ignore_labels=("do-not-merge" "rfc" "wip")
 
-	local labels=$(hub api "/repos/{owner}/{repo}/labels" | jq -r '.[].name')
+	local labels=$(hub issue labels)
 
 	local label
 
