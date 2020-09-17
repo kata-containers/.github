@@ -755,6 +755,7 @@ list_issues_for_pr()
     # This needs to be careful to take account of lines like this:
     #
     # fixes 99
+    # fixes: 77
     # fixes #123.
     # Fixes: #1, #234, #5678.
     #
@@ -766,7 +767,7 @@ list_issues_for_pr()
     #
     local issues=$(echo "$commits" |\
         egrep -v "^( |	)" |\
-        egrep -i "fixes:* *(#[0-9][0-9]*)" |\
+        egrep -i "fixes:* *(#*[0-9][0-9]*)" |\
         tr ' ' '\n' |\
         grep "[0-9][0-9]*" |\
         sed 's/[.,\#]//g' |\
