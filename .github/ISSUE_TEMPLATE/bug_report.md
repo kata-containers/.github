@@ -11,9 +11,15 @@ assignees: ''
 
 To help us understand the problem more quickly, please do the following:
 
-1. Run the `kata-collect-data.sh` script, which is installed as part of Kata Containers.
+1. Run the `kata-collect-data.sh` script, which is installed as part of Kata Containers
+   or `kata-containers.collect-data`, which is installed as part of the Kata Containers
+   snapcraft package.
    ```sh
    $ sudo kata-collect-data.sh > /tmp/kata.log
+   ```
+   or
+   ```sh
+   $ sudo kata-containers.collect-data > /tmp/kata.log
    ```
 1. Review the output file (`/tmp/kata.log`) to ensure it doesn't
    contain any private / sensitive information
