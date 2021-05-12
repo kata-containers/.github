@@ -33,6 +33,7 @@ Description: Utility to expand the abilities of the GitHub hub(1) tool.
 Command descriptions:
 
   add-issue                 Add an issue to a project.
+  add-issue-comment         Add a comment on an issue.
   list-columns              List project board columns.
   list-issue-linked-prs (*) List all PRs with linked issues.
   list-issue-projects       List projects an issue is part of.
@@ -50,6 +51,7 @@ Command descriptions:
 Commands and arguments:
 
   add-issue             <issue> <project> <project-type> [<column-name>]
+  add-issue-comment     <issue> <repo-slug> <comment-file>
   list-columns          <project> <project-type>
   list-issue-linked-prs
   list-issue-projects   <issue>
@@ -539,6 +541,41 @@ add_issue_to_project()
     echo "Added issue ${issue} to project $project_type '$project'"
 }
 
+add_issue_comment()
+{
+    local issue="${1:-}"
+    local repo_slug="${2:-}"
+    local comment_file="${3:-}"
+
+    [ -z "$issue" ] && die "need issue"
+    [ -z "$repo_slug" ] && die "need repo slug (org/repo)"
+    [ -z "$comment_file" ] && die "need comment file"
+
+    echo "$repo_slug" | grep -q / || die "invalid repo slug: $repo_slug"
+    [ -r "$comment_file" ] || die "invalid comment file: $comment_file"
+
+    local body_file=$(mktemp)
+    local tmp_body_file=$(mktemp)
+
+    local text=$(< "$comment_file")
+
+    printf '%s' "$text" |\
+        python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' |\
+        sed -e 's/^"//g' -e 's/"$//g' > "$tmp_body_file"
+
+    printf '{"body": "%s"}' "$(<$tmp_body_file)" > "$body_file"
+
+    jq -S . < "$body_file" &>/dev/null || die "BUG: invalid JSON in file: $body_file"
+
+    hub api \
+        --input "$body_file" \
+        "/repos/${repo_slug}/issues/${issue}/comments" >/dev/null
+
+    rm -f \
+        "$body_file" \
+        "$tmp_body_file"
+}
+
 move_issue_project_column()
 {
     local issue="${1:-}"
@@ -886,6 +923,7 @@ handle_args()
 
     case "$cmd" in
         add-issue) ;;
+        add-issue-comment) ;;
         help|--help|usage) usage && exit 0 ;;
         list-columns) ;;
         list-issue-linked-prs) ;;
@@ -921,6 +959,18 @@ handle_args()
             [ -z "$project_type" ] && project_type="repo"
 
             add_issue_to_project "$issue" "$project" "$project_type"
+            ;;
+
+        add-issue-comment)
+            issue="${1:-}"
+
+            local repo_slug="${2:-}"
+            local comment_file="${3:-}"
+
+            add_issue_comment \
+                "$issue" \
+                "$repo_slug" \
+                "$comment_file"
             ;;
 
         list-columns)
