@@ -599,7 +599,7 @@ move_issue_project_column()
 
     [ "$ret" -eq 0 ] || die "Failed to move issue ${issue} to project $project_type '$project' column '$project_column'"
 
-    echo "Moved issue $issue to column $project_column in project $project_type '$project'"
+    echo "Moved issue $issue to column $project_column in $project_type project '$project'"
 }
 
 list_projects()
