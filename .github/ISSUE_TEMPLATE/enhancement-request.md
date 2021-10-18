@@ -19,6 +19,6 @@ Describe how specifically you think it could be improved.
 
 Anything else to add?
 
-**Before raising this feature request**
+**Before raising this enhancement request**
 
-Have you looked at the [limitations document](https://github.com/kata-containers/documentation/blob/master/Limitations.md)?
+Have you looked at the [limitations document](https://github.com/kata-containers/kata-containers/blob/main/docs/Limitations.md)?
