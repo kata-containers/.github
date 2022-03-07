@@ -73,7 +73,6 @@ handle_args()
 	# only need one of these labels to be applied since by definition they
 	# can only apply to one porting direction.
 	local backport_labels=("needs-backport" "no-backport-needed" "backport")
-	local forward_port_labels=("needs-forward-port" "no-forward-port-needed" "forward-port")
 
 	# If a PR is labelled with one of these labels, ignore all further
 	# checks (since the PR is not yet "ready").
@@ -85,7 +84,7 @@ handle_args()
 
 	# Note: no validation done on ignore_labels as they are not actually
 	# porting labels, and so are not essential.
-	for label in ${backport_labels[@]} ${forward_port_labels[@]}
+	for label in ${backport_labels[@]}
 	do
 		local ret
 
@@ -104,10 +103,9 @@ handle_args()
 		tr ',' '\n')
 
 	[ -z "$pr_labels" ] && {
-		printf "::error::PR %s does not have required porting labels (expected one of '%s' and one of '%s')\n" \
+		printf "::error::PR %s does not have required porting labels (expected one of '%s')\n" \
 		"$pr" \
 		$(echo "${backport_labels[@]}" | tr ' ' ',') \
-		$(echo "${forward_port_labels[@]}" | tr ' ' ',')
 		exit 1
 	}
 
@@ -127,7 +125,6 @@ handle_args()
 	}
 
 	local backport_labels_found=()
-	local forward_port_labels_found=()
 
 	for label in ${backport_labels[@]}
 	do
@@ -136,35 +133,16 @@ handle_args()
 	done
 
 	local backport_pr="false"
-	local forward_port_pr="false"
-
-	for label in ${forward_port_labels[@]}
-	do
-		echo "$pr_labels" | egrep -q "^${label}$" \
-			&& forward_port_labels_found+=("$label")
-	done
 
 	[ "${#backport_labels_found[@]}" -eq 1 ] && \
 		[ "$backport_labels_found" = 'backport' ] && \
 		backport_pr="true"
 
-	[ "${#forward_port_labels_found[@]}" -eq 1 ] && \
-		[ "$forward_port_labels_found" = 'forward-port' ] && \
-		forward_port_pr="true"
-
-	# If a PR isn't a forward port PR, it should have atleast one backport
-	# label.
-	[ "$forward_port_pr" = false ] && [ "${#backport_labels_found[@]}" -eq 0 ] && {
+	# PR should have at least one backport label
+	[ "${#backport_labels_found[@]}" -eq 0 ] && {
 		printf "::error::PR %s missing a backport label (expected one of '%s')\n" \
 		"$pr" \
 		$(echo "${backport_labels[@]}" | tr ' ' ',')
-		exit 1
-	}
-
-	[ "$forward_port_pr" = true ] && [ "${#backport_labels_found[@]}" -gt 0 ] && {
-		printf "::error::Forward port labelled PR %s cannot have backport labels (backport labels found '%s')\n" \
-		"$pr" \
-		$(echo "${backport_labels_found[@]}" | tr ' ' ',')
 		exit 1
 	}
 
@@ -176,42 +154,9 @@ handle_args()
 		exit 1
 	}
 
-	# If a PR isn't a backport PR, it should have atleast one forward port
-	# label.
-	[ "$backport_pr" = false ] && [ "${#forward_port_labels_found[@]}" -eq 0 ] && {
-		printf "::error::PR %s missing a forward port label (expected one of '%s')\n" \
-		"$pr" \
-		$(echo "${forward_port_labels[@]}" | tr ' ' ',')
-		exit 1
-	}
-
-	[ "$backport_pr" = true ] && [ "${#forward_port_labels_found[@]}" -gt 0 ] && {
-		printf "::error::Backport labelled PR %s cannot have forward port labels (forward port labels found '%s')\n" \
-		"$pr" \
-		$(echo "${forward_port_labels_found[@]}" | tr ' ' ',')
-		exit 1
-	}
-
-	[ "${#forward_port_labels_found[@]}" -gt 1 ] && {
-		printf "::error::PR %s has too many forward port labels (expected one of '%s', found '%s')\n" \
-		"$pr" \
-		$(echo "${forward_port_labels[@]}" | tr ' ' ',') \
-		$(echo "${forward_port_labels_found[@]}" | tr ' ' ',')
-		exit 1
-	}
-
-	[ "$backport_pr" = true ] && [ "$forward_port_pr" = true ] && {
-		printf "::error::PR %s cannot be labelled as both backport ('%s') and forward port ('%s')\n" \
+	printf "::debug::PR %s has required porting labels (backport label '%s')\n" \
 		"$pr" \
 		"${backport_labels_found[@]}" \
-		"${forward_port_labels_found[@]}"
-		exit 1
-	}
-
-	printf "::debug::PR %s has required porting labels (backport label '%s', forward port label '%s')\n" \
-		"$pr" \
-		"${backport_labels_found[@]}" \
-		"${forward_port_labels_found[@]}"
 }
 
 main()
