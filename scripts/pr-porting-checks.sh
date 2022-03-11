@@ -156,7 +156,7 @@ handle_args()
 
 	printf "::debug::PR %s has required porting labels (backport label '%s')\n" \
 		"$pr" \
-		"${backport_labels_found[@]}" \
+		"${backport_labels_found[@]}"
 }
 
 main()
