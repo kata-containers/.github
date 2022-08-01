@@ -828,6 +828,22 @@ list_issues_for_pr()
     done
 }
 
+list_labels_for_issue()
+{
+    local issue="${1:-}"
+
+    [ -z "$issue" ] && die "need issue number"
+
+    local labels=$(github_api \
+        -XGET "/repos/{owner}/{repo}/issues/$issue" |\
+        jq -r '.labels' || true)
+
+    [ -z "labels" ] && die "cannot determine labels for issue $issue"
+
+    printf "$labels"
+}
+
+
 # List PRs with one or more [*] links to an issue.
 #
 # [*] - Consider a PR which includes multiple "Fixes: #XXX" comments.
@@ -934,6 +950,7 @@ handle_args()
         list-pr-linked-issues) ;;
         list-prs-for-issue) ;;
         list-projects) ;;
+        list-labels-for-issue) ;;
         move-issue) ;;
 
         "") usage && exit 0 ;;
@@ -1015,6 +1032,12 @@ handle_args()
             project_type="${1:-}"
 
             list_projects "$project_type"
+            ;;
+
+        list-labels-for-issue)
+            issue="${1:-}"
+
+            list_labels_for_issue "$issue"
             ;;
 
         move-issue)
