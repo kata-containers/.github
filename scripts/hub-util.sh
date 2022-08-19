@@ -843,6 +843,20 @@ list_labels_for_issue()
     printf "$labels"
 }
 
+list_labels_for_pr()
+{
+    local pr="${1:-}"
+
+    [ -z "$pr" ] && die "need PR"
+
+    local labels=$(github_api \
+        -XGET "/repos/{owner}/{repo}/pulls/$pr" | \
+        jq -r '.labels' || true)
+    
+    [ -z "labels" ] && die "cannot determine labels for issue $issue"
+
+    printf "$labels"
+}
 
 # List PRs with one or more [*] links to an issue.
 #
@@ -946,11 +960,12 @@ handle_args()
         list-issue-projects) ;;
         list-issues) ;;
         list-issues-for-pr) ;;
+        list-labels-for-issue) ;;
+        list-labels-for-pr) ;;
         list-milestones) ;;
         list-pr-linked-issues) ;;
         list-prs-for-issue) ;;
         list-projects) ;;
-        list-labels-for-issue) ;;
         move-issue) ;;
 
         "") usage && exit 0 ;;
@@ -1038,6 +1053,12 @@ handle_args()
             issue="${1:-}"
 
             list_labels_for_issue "$issue"
+            ;;
+
+        list-labels-for-pr)
+            pr="${1:-}"
+
+            list_labels_for_pr "$pr"
             ;;
 
         move-issue)
