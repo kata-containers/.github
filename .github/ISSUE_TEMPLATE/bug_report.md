@@ -44,3 +44,7 @@ so saves time for both of us! :smile:
 # Further information
 
 (replace this text with any extra information you think might be useful)
+
+# Kata Containers survey
+
+Please consider taking the survey to help us help you: https://openinfrafoundation.formstack.com/forms/kata_containers_user_survey
