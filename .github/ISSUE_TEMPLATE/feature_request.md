@@ -26,3 +26,7 @@ Add any other context or screenshots about the feature request here.
 **Before raising this feature request**
 
 Have you looked at the [limitations document](https://github.com/kata-containers/kata-containers/blob/main/docs/Limitations.md)?
+
+**Kata Containers survey**
+
+Please consider taking the survey to help us help you: https://openinfrafoundation.formstack.com/forms/kata_containers_user_survey

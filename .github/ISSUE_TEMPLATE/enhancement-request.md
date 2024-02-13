@@ -22,3 +22,7 @@ Anything else to add?
 **Before raising this enhancement request**
 
 Have you looked at the [limitations document](https://github.com/kata-containers/kata-containers/blob/main/docs/Limitations.md)?
+
+**Kata Containers survey**
+
+Please consider taking the survey to help us help you: https://openinfrafoundation.formstack.com/forms/kata_containers_user_survey
