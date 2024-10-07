@@ -11,6 +11,7 @@ assignees: ''
 
 To help us understand the problem more quickly, please do the following:
 
+1. Ensure that you've reproduced the issue with the [latest release](https://github.com/kata-containers/kata-containers/releases).
 1. Run the `kata-collect-data.sh` script, which is installed as part of Kata Containers
    or `kata-containers.collect-data`, which is installed as part of the Kata Containers
    snapcraft package.
