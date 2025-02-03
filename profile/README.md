@@ -21,6 +21,11 @@ See the
 See the
 [official documentation](https://github.com/kata-containers/kata-containers/tree/main/docs).
 
+## How to report a security vulnerability
+
+See the
+[vulnerability handling guide](https://github.com/kata-containers/community?tab=readme-ov-file#vulnerability-handling).
+
 ## Developers
 
 The source code and unit test code for Kata Containers lives in the
