@@ -23,18 +23,8 @@ See the
 
 ## Developers
 
-The source code and unit test code for Kata Containers lives in the
+The source code and test code for Kata Containers lives in the
 [main repository](https://github.com/kata-containers/kata-containers).
-
-## Testers
-
-The
-[`tests`](https://github.com/kata-containers/tests)
-repository contains the more advanced test code run by the
-[Kata Containers Continuous Integration (CI) system](http://jenkins.katacontainers.io/).
-
-The configuration files for the CI itself live in the
-[`ci`](https://github.com/kata-containers/ci) repository.
 
 ## Web developers
 
